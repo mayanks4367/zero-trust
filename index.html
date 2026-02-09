@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vault Key</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { background-color: #121212; color: #00ff00; font-family: monospace; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #qrcode { background: white; padding: 20px; border-radius: 10px; }
+        h1 { text-transform: uppercase; letter-spacing: 2px; }
+        .status { margin-top: 20px; color: #ff0000; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <h1>Zero-Trust Key</h1>
+    <div id="qrcode"></div>
+    <div class="status">● TRANSMITTING SECURE TOKEN</div>
+
+    <script>
+        // The exact string the Python script looks for
+        const SECRET_KEY = "UNLOCK_MY_VAULT_NOW";
+        
+        // Generate QR
+        new QRCode(document.getElementById("qrcode"), {
+            text: SECRET_KEY,
+            width: 256,
+            height: 256
+        });
+    </script>
+</body>
+</html>
