@@ -38,7 +38,7 @@ static struct device *secret_device;
 
 // --- Timer Callback ---
 // This function runs automatically after 30 seconds
-void auto_lock_callback(struct timer_list *t)
+static void auto_lock_callback(struct timer_list *t)
 {
     mutex_lock(&secret_mutex);
     is_unlocked = 0;
@@ -213,7 +213,7 @@ err_chrdev:
 
 static void __exit secret_exit(void)
 {
-    del_timer(&lock_timer); // Stop timer so it doesn't crash after unload
+    timer_delete_sync(&lock_timer); // Stop timer so it doesn't crash after unload
     device_destroy(secret_class, device_num);
     class_destroy(secret_class);
     cdev_del(&secret_cdev);
