@@ -1,0 +1,12 @@
+# Black Box Vault - Python Dependencies
+# Core guard script dependencies
+opencv-python>=4.8.0
+qrcode[pil]>=7.4.0
+
+# Mobile app dependencies (optional)
+kivy>=2.2.0
+buildozer>=1.5.0
+
+# Development and testing (optional)
+pytest>=7.0.0
+flake8>=5.0.0

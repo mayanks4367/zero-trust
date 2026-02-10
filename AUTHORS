@@ -1,0 +1,52 @@
+# Black Box Vault - Authors
+
+This file lists all contributors to the Black Box Vault project.
+
+## Core Team
+
+- **Mayank** <mayank@example.com> - Project Lead & Kernel Developer
+
+## Contributors
+
+### Code Contributors
+- [Add your name and contribution here]
+
+### Documentation Contributors
+- [Add your name and contribution here]
+
+### Security Researchers
+- [Add your name and contribution here]
+
+### Testers
+- [Add your name and contribution here]
+
+## Contribution Types
+
+- **💻 Code**: New features, bug fixes, refactoring
+- **📖 Documentation**: README, guides, technical docs
+- **🔒 Security**: Vulnerability reports, security improvements
+- **🧪 Testing**: Test cases, bug reports, quality assurance
+- **🎨 Design**: UI/UX improvements, visual design
+- **🌍 Translation**: Localization and internationalization
+- **💡 Ideas**: Feature suggestions, architectural insights
+
+## How to Add Yourself
+
+To be added to this file:
+
+1. Make a significant contribution to the project
+2. Submit a pull request with your changes
+3. Add yourself to the appropriate section with:
+   - Your name (and preferred attribution)
+   - Contact information (optional)
+   - Brief description of contributions
+
+## Recognition
+
+All contributors are acknowledged in:
+- Release notes
+- Project documentation
+- Community communications
+- Project history and metrics
+
+Thank you to everyone who has contributed to making Black Box Vault more secure and useful!
