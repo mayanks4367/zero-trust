@@ -1,0 +1,5 @@
+# Black Box Vault Mobile App Dependencies
+kivy>=2.2.0
+qrcode>=8.0.0
+pillow>=8.0.0
+buildozer>=1.5.0

@@ -10,12 +10,12 @@ The Black Box Vault implements a secure, hardware-isolated secret storage system
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web/Mobile   │    │   Guard Script  │    │  Kernel Module  │
-│   QR Display   │───▶│   (Eyes/Brain)  │───▶│  (Vault Core)   │
-│                │    │                 │    │                 │
-│ - index.html   │    │ - QR Detection  │    │ - /dev/secret   │
-│ - Android App  │    │ - Validation    │    │ - PIN Auth      │
-│ - QR Code      │    │ - IOCTL Calls   │    │ - Auto-Lock     │
+│   Web/Mobile    │    │   Guard Script  │    │  Kernel Module  │
+│   QR Display    │───▶│   (Eyes/Brain)  │───▶│  (Vault Core)   │
+│                 │    │                 │    │                 │
+│ - index.html    │    │ - QR Detection  │    │ - /dev/secret   │
+│ - Android App   │    │ - Validation    │    │ - PIN Auth      │
+│ - QR Code       │    │ - IOCTL Calls   │    │ - Auto-Lock     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 

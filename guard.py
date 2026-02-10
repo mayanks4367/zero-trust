@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Zero-Trust Guard Script
+Zero-Trust Guard Script (FIXED VERSION)
 
 This script implements a QR code-based authentication system for the kernel vault.
 
@@ -19,6 +19,7 @@ import os
 import fcntl
 import struct
 import time
+import numpy as np
 
 # --- CONFIGURATION ---
 DEVICE_PATH = "/dev/secret_vault"
@@ -54,35 +55,20 @@ def unlock_kernel_vault():
         print(f"\n[!] ERROR: {e}")
     return False
 
-def decode_qr_opencv(frame):
-    """Brain: QR Code Decoding using OpenCV's built-in detector"""
-    try:
-        # Initialize QR code detector
-        detector = cv2.QRCodeDetector()
-        
-        # Detect and decode
-        data, points, _ = detector.detectAndDecode(frame)
-        
-        if data:
-            return data, points
-        return None, None
-    except Exception as e:
-        print(f"QR detection error: {e}")
-        return None, None
-
 def start_guard():
     """Eyes: Webcam Monitoring"""
     print("[*] Starting Zero-Trust Guard...")
     print("[*] Waiting for QR Code...")
     
+    # Initialize the detector once (better performance)
+    detector = cv2.QRCodeDetector()
+
     # Open Webcam (0 is usually the default cam)
     cap = cv2.VideoCapture(0)
     
     # Check if camera opened successfully
     if not cap.isOpened():
         print("[!] ERROR: Could not open camera")
-        print("[!] Trying alternative camera indices...")
-        
         # Try other camera indices
         for i in range(1, 5):
             cap = cv2.VideoCapture(i)
@@ -102,25 +88,43 @@ def start_guard():
                 print("[!] ERROR: Could not read frame")
                 break
 
-            # Decode any QR codes in the frame using OpenCV
-            qr_data, points = decode_qr_opencv(frame)
+            # --- BRAIN: Detect and Decode ---
+            qr_data, points, _ = detector.detectAndDecode(frame)
 
-            if qr_data and points is not None:
-                # Draw a rectangle around the QR code (Visual Feedback)
-                points = points.astype(int)
-                for i in range(len(points)):
-                    cv2.line(frame, tuple(points[i]), tuple(points[(i+1) % len(points)]), (0, 255, 0), 3)
+            if qr_data:
+                # --- VISUALS: Draw the Green Box ---
+                if points is not None:
+                    # FIX: OpenCV returns points as [[[x1,y1], [x2,y2]...]] (Shape: 1,4,2)
+                    # We need to unwrap the first layer to get [[x1,y1]...] (Shape: 4,2)
+                    if len(points.shape) == 3:
+                        points = points[0]
+                    
+                    # Convert to integer for drawing
+                    points = points.astype(int)
+                    
+                    # Draw lines between corners
+                    for i in range(4):
+                        pt1 = tuple(points[i])
+                        pt2 = tuple(points[(i+1) % 4])
+                        cv2.line(frame, pt1, pt2, (0, 255, 0), 3)
 
-                # CHECK THE KEY
+                # --- SECURITY CHECK ---
                 if qr_data == SECRET_QR_TEXT:
                     print(f"[+] VALID KEY DETECTED: {qr_data}")
                     unlock_kernel_vault()
-                    
-                    # Wait 5 seconds so we don't spam the kernel (Safety: Rate Limiting)
-                    print("[*] Rate limiting: Waiting 5 seconds...")
-                    time.sleep(5)
+    
+                    print("[*] MISSION SUCCESS: Vault Unlocked.")
+                    print("[*] Closing Guard automatically...")
+    
+                    # Visual feedback before closing (Green Box)
+                    cv2.imshow('Zero-Trust Guard', frame) 
+                    cv2.waitKey(2000) # Show success for 2 seconds
+    
+                    break 
                 else:
+                    # Only print invalid keys once per second to avoid spam
                     print(f"[-] Invalid Key: {qr_data}")
+                    time.sleep(1)
 
             # Show the video feed
             cv2.imshow('Zero-Trust Guard', frame)
@@ -131,6 +135,8 @@ def start_guard():
                 
     except KeyboardInterrupt:
         print("\n[*] Interrupted by user")
+    except Exception as e:
+        print(f"\n[!] Unexpected Error: {e}")
     finally:
         # Cleanup
         cap.release()
@@ -141,16 +147,16 @@ if __name__ == "__main__":
     # Check if device exists
     if not os.path.exists(DEVICE_PATH):
         print(f"[!] Error: {DEVICE_PATH} not found.")
-        print("[!] Did you run 'sudo insmod vault_driver.ko'?")
-        print("[!] Or create the device node with:")
-        print(f"[!] sudo mknod {DEVICE_PATH} c <major> <minor>")
+        print("[!] Did you run 'sudo insmod vault.ko'?")
     else:
-        # Check if running with appropriate permissions for device access
+        # Check permissions
         try:
-            test_fd = os.open(DEVICE_PATH, os.O_RDONLY)
-            os.close(test_fd)
+            # Try to open simply to check permissions
+            # Note: We use os.open just to verify access, then close immediately
+            fd = os.open(DEVICE_PATH, os.O_RDONLY)
+            os.close(fd)
             print(f"[+] Device {DEVICE_PATH} accessible")
+            start_guard()
         except PermissionError:
-            print(f"[!] Warning: {DEVICE_PATH} not accessible. May need sudo or device permissions.")
-        
-        start_guard()
+            print(f"[!] Warning: {DEVICE_PATH} not accessible.")
+            print(f"[!] FIX: Run 'sudo chmod 666 {DEVICE_PATH}'")
