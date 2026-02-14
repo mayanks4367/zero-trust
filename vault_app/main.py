@@ -1,157 +1,257 @@
 #!/usr/bin/env python3
 """
-Black Box Vault - Mobile QR Code Application
-A polished Kivy-based Android app for displaying QR codes to unlock the vault.
-NO-DEPENDENCY VERSION (Removes Pillow/JPEG requirement)
+Black Box Vault - Polished UI Version
+Look-and-feel update matching the provided target image.
 """
-
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
+from kivy.core.window import Window
+from kivy.lang import Builder
 import qrcode
+import time
+import hmac
+import hashlib
+import struct
+
+# --- CONFIGURATION ---
+SHARED_SECRET = b"MY_SUPER_SECRET_VAULT_KEY"
+
+# --- Kivy Language Styling (KV) ---
+# This defines the look and feel: colors, rounded corners, and layout structure.
+KV_STYLES = """
+#:import hex kivy.utils.get_color_from_hex
+
+# Define Theme Colors
+#:set color_bg_dark hex('#1a1c23')
+#:set color_bg_light hex('#2b2e3b')
+#:set color_white hex('#ffffff')
+#:set color_gray hex('#8a8a8a')
+#:set color_accent hex('#f5c542') # Yellow/Gold
+
+<RootLayout>:
+    orientation: 'vertical'
+    canvas.before:
+        Color:
+            rgba: color_bg_dark
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+# Custom Label optimized for the dark theme
+<DarkThemeLabel@Label>:
+    color: color_white
+    markup: True
+
+<SubTextLabel@Label>:
+    color: color_gray
+    font_size: '14sp'
+
+# The white rounded container for the QR code
+<QRContainer@AnchorLayout>:
+    anchor_x: 'center'
+    anchor_y: 'center'
+    padding: dp(20)
+    canvas.before:
+        Color:
+            rgba: color_white
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(15),]
+
+# The visual "scanner brackets" overlay
+<ScannerOverlay@Widget>:
+    canvas:
+        Color:
+            rgba: color_accent
+        Line:
+            width: dp(2)
+            # Top Left corner
+            points: [self.x, self.top - dp(20), self.x, self.top, self.x + dp(20), self.top]
+        Line:
+            width: dp(2)
+            # Top Right corner
+            points: [self.right - dp(20), self.top, self.right, self.top, self.right, self.top - dp(20)]
+        Line:
+            width: dp(2)
+            # Bottom Left corner
+            points: [self.x, self.y + dp(20), self.x, self.y, self.x + dp(20), self.y]
+        Line:
+            width: dp(2)
+            # Bottom Right corner
+            points: [self.right - dp(20), self.y, self.right, self.y, self.right, self.y + dp(20)]
+
+# Bottom Navigation Item style
+<NavItem@BoxLayout>:
+    orientation: 'vertical'
+    icon_text: ''
+    label_text: ''
+    is_active: False
+    DarkThemeLabel:
+        text: root.icon_text
+        font_size: '20sp'
+        color: color_accent if root.is_active else color_gray
+        size_hint_y: 0.6
+    DarkThemeLabel:
+        text: root.label_text
+        font_size: '11sp'
+        color: color_accent if root.is_active else color_gray
+        size_hint_y: 0.4
+
+# ================= MAIN UI STRUCTURE =================
+<MainUI>:
+    orientation: 'vertical'
+    spacing: dp(10)
+    
+    # --- TOP SPACER / HEADER ---
+    BoxLayout:
+        size_hint_y: 0.15
+        DarkThemeLabel:
+            text: "Place QR Code in the frame"
+            font_size: '16sp'
+            valign: 'bottom'
+
+    # --- MIDDLE CONTENT (QR AREA) ---
+    AnchorLayout:
+        size_hint_y: 0.6
+        anchor_x: 'center'
+        anchor_y: 'center'
+        
+        # The white rounded box
+        QRContainer:
+            size_hint: None, None
+            size: dp(280), dp(280)
+            
+            # The actual QR image inside the white box
+            Image:
+                id: qr_image_widget
+                allow_stretch: True
+                keep_ratio: True
+                size_hint: 0.9, 0.9
+                
+            # The yellow brackets overlay
+            ScannerOverlay:
+                size_hint: 0.95, 0.95
+
+    # --- STATUS TEXT AREA ---
+    BoxLayout:
+        orientation: 'vertical'
+        size_hint_y: 0.15
+        padding: dp(10)
+        DarkThemeLabel:
+            id: token_label_widget
+            text: "---"
+            font_size: '32sp'
+            bold: True
+        SubTextLabel:
+            id: timer_label_widget
+            text: "Refreshing..."
+
+    # --- BOTTOM NAVIGATION BAR ---
+    BoxLayout:
+        size_hint_y: 0.1
+        padding: dp(10)
+        canvas.before:
+            Color:
+                rgba: color_bg_light
+            Rectangle:
+                pos: self.pos
+                size: self.size
+                
+        NavItem:
+            icon_text: '[b]L[/b]' # Using fake text icons for simplicity
+            label_text: 'Screen'
+            is_active: True
+        NavItem:
+            icon_text: 'G'
+            label_text: 'Generate'
+        NavItem:
+            icon_text: 'H'
+            label_text: 'History'
+        NavItem:
+            icon_text: 'S'
+            label_text: 'Settings'
+"""
+# Load style definitions
+Builder.load_string(KV_STYLES)
+
+class RootLayout(BoxLayout):
+    pass
+
+class MainUI(RootLayout):
+    """The main application layout defined in KV structure above"""
+    pass
 
 class VaultKeyApp(App):
-    """Main application class for Black Box Vault key display."""
-    
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.qr_data = "UNLOCK_MY_VAULT_NOW"
-        self.title_text = "[b]BLACK BOX VAULT[/b]\n[color=#66ff66]Secure Key System[/color]"
-        
     def build(self):
-        """Build the main application UI."""
-        # Main Layout (Vertical)
-        layout = BoxLayout(
-            orientation='vertical', 
-            padding=[20, 40, 20, 40],  # Top, Right, Bottom, Left padding
-            spacing=25
-        )
+        # Set window size for desktop testing to match phone aspect ratio
+        # Window.size = (350, 700) 
         
-        # 1. Title Label with enhanced styling
-        title = Label(
-            text=self.title_text,
-            markup=True, 
-            font_size='28sp',
-            size_hint=(1, None),
-            halign='center',
-            valign='middle',
-            color=(1, 1, 1, 1),  # White text
-            text_size=(None, None),
-            line_height=1.2
-        )
+        # Initialize the main UI defined in KV
+        self.root_widget = MainUI()
         
-        # 2. QR Code Image Holder with border
-        qr_container = BoxLayout(
-            size_hint=(1, 0.6),
-            padding=10
-        )
+        # Get references to the widgets we need to update via their IDs in KV
+        self.qr_image = self.root_widget.ids.qr_image_widget
+        self.token_label = self.root_widget.ids.token_label_widget
+        self.timer_label = self.root_widget.ids.timer_label_widget
         
-        # Note: allow_stretch=True allows it to scale up while keeping pixel sharpness
-        self.qr_image = Image(
-            size_hint=(0.8, 0.8),
-            allow_stretch=True,
-            keep_ratio=True
-        )
+        self.last_generated_time_block = 0
         
-        qr_container.add_widget(self.qr_image)
+        # Run the update loop every 1 second
+        Clock.schedule_interval(self.update_state, 1)
+        # Generate immediately on start
+        self.update_state(0)
         
-        # 3. Status Label with enhanced styling
-        self.status = Label(
-            text="[color=#ffff00]● GENERATING TOKEN...[/color]",
-            markup=True,
-            font_size='18sp',
-            size_hint=(1, None),
-            halign='center',
-            color=(1, 1, 0, 1),  # Yellow text
-            bold=True
-        )
-        
-        # 4. Instructions Label
-        instructions = Label(
-            text="[color=#888888]Show this QR code to the vault guard system[/color]",
-            markup=True,
-            font_size='14sp',
-            size_hint=(1, None),
-            halign='center',
-            color=(0.8, 0.8, 0.8, 1),  # Gray text
-            text_size=(None, None)
-        )
-        
-        # Add widgets to layout
-        layout.add_widget(title)
-        layout.add_widget(qr_container)
-        layout.add_widget(self.status)
-        layout.add_widget(instructions)
-        
-        # Generate QR Code immediately
-        Clock.schedule_once(self.generate_qr, 0.1)
-        
-        return layout
+        return self.root_widget
 
-    def generate_qr(self, dt=None):
-        """Generate and display QR code using raw matrix (No Pillow needed)."""
-        try:
-            # 1. Generate the QR Matrix (List of True/False)
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=1, # We handle scaling via Texture, so 1 is fine here
-                border=2
-            )
-            qr.add_data(self.qr_data)
-            qr.make(fit=True)
-            matrix = qr.get_matrix()
-            
-            # 2. Convert Matrix to Raw Pixels
-            # We build a byte array: White=[255,255,255], Black=[0,0,0]
-            # 3 bytes per pixel (RGB)
-            buff = bytearray()
-            for row in matrix:
-                for val in row:
-                    if val:
-                        # True = Black (The data)
-                        buff.extend([0, 0, 0])
-                    else:
-                        # False = White (The background)
-                        buff.extend([255, 255, 255])
-            
-            # 3. Create a Kivy Texture
-            # The size is simply the number of modules (dots) in the QR code
-            matrix_dim = len(matrix)
-            texture = Texture.create(size=(matrix_dim, matrix_dim), colorfmt='rgb')
-            
-            # 4. Load the data into the texture
-            texture.blit_buffer(bytes(buff), colorfmt='rgb', bufferfmt='ubyte')
-            
-            # 5. Make it sharp (Nearest Neighbor scaling)
-            # This is crucial! It keeps the QR code crisp like pixel art
-            # instead of blurry when scaled up on a phone screen.
-            texture.mag_filter = 'nearest' 
-            texture.min_filter = 'nearest'
-            
-            # 6. Apply to Image
-            self.qr_image.texture = texture
-            
-            # Update status
-            self.status.text = "[color=#00ff00]✓ TOKEN ACTIVE[/color]\n[color=#888888]Ready for scanning[/color]"
-            print(f"[+] QR Code generated successfully: {self.qr_data}")
-            
-        except Exception as e:
-            error_msg = f"QR Generation Error: {str(e)}"
-            self.status.text = f"[color=#ff4444]✗ ERROR[/color]\n[color=#888888]{error_msg}[/color]"
-            print(f"[!] {error_msg}")
-            import traceback
-            traceback.print_exc()
+    # --- LOGIC (Same as before) ---
+    def get_totp_token(self):
+        """Generates a time-based hash valid for 30 seconds"""
+        time_block = int(time.time() // 30)
+        if time_block == self.last_generated_time_block:
+            return None
+        self.last_generated_time_block = time_block
+        msg = struct.pack(">Q", time_block)
+        h = hmac.new(SHARED_SECRET, msg, hashlib.sha256).hexdigest()
+        return h[:8].upper()
 
-    def on_start(self):
-        print("[*] Black Box Vault Mobile App Started")
+    def update_state(self, dt):
+        # Update Timer Text
+        seconds_remaining = 30 - (int(time.time()) % 30)
+        self.timer_label.text = f"Refreshing token in: {seconds_remaining}s"
+        
+        # Check for new token block
+        new_token = self.get_totp_token()
+        if new_token:
+            self.generate_qr(new_token)
+            # Update main token text
+            self.token_label.text = new_token
 
-    def on_resume(self):
-        print("[*] App resumed")
-        Clock.schedule_once(self.generate_qr, 0.1)
+    def generate_qr(self, data):
+        # Standard "No-Dependency" QR Generation
+        # IMPORTANT: border=0 because we are putting it inside a white frame anyway
+        qr = qrcode.QRCode(box_size=1, border=0) 
+        qr.add_data(data)
+        qr.make(fit=True)
+        matrix = qr.get_matrix()
+        
+        buff = bytearray()
+        for row in matrix:
+            for val in row:
+                # Black pixels for data, White for background
+                buff.extend([0, 0, 0] if val else [255, 255, 255])
+        
+        size = len(matrix)
+        texture = Texture.create(size=(size, size), colorfmt='rgb')
+        texture.blit_buffer(bytes(buff), colorfmt='rgb', bufferfmt='ubyte')
+        # Nearest neighbor for sharp pixel look
+        texture.mag_filter = 'nearest' 
+        self.qr_image.texture = texture
 
 if __name__ == '__main__':
     VaultKeyApp().run()
