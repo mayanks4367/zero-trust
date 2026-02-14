@@ -45,7 +45,7 @@ def unlock_kernel_vault():
 def start_guard():
     print("[*] Starting Dynamic TOTP Guard...")
     detector = cv2.QRCodeDetector()
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
     try:
         while True:
@@ -88,6 +88,9 @@ def start_guard():
     finally:
         cap.release()
         cv2.destroyAllWindows()
+        cv2.waitKey(1)
+        print("[*] Guard stopped.")
+        os._exit(0)
 
 if __name__ == "__main__":
     start_guard()
